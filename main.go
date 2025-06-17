@@ -5,15 +5,13 @@ import (
 	"strings"
 	"bufio"
 	"os"
+	"time"
+	"github.com/Sirkle23/PokedexGo/PokeCache"
 )
 
-type cliCommand struct {
-	name		string
-	description	string
-	callback	func() error
-}
-
-var cliCommands map[string]cliCommand
+const (
+	BaseURL = "https://pokeapi.co/api/v2/"
+)
 
 func cleanInput(text string) []string {
 	// Split the input text into words
@@ -31,35 +29,14 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit() error {
-	fmt.Println("Closing the Pokedex... Goodbye!")
-	os.Exit(0)
-	return nil
-}
-
-func commandHelp() error {
-	fmt.Printf("Welcome to the Pokedex!\nUsage:\n\n")
-	for _, command := range cliCommands {
-		fmt.Printf("%s: %s\n", command.name, command.description)
-	}
-	return nil
-}
-
 func main() {
-	// Initialize commands map here
-    cliCommands = make(map[string]cliCommand)
+	url := BaseURL + "location-area"
+	cfg := &config{
+		NextURL:     &url,
+		PreviousURL: nil,
+	}
 
-    // Add commands to the map
-    cliCommands["exit"] = cliCommand{ 
-		name:        "exit",
-		description: "Exit the Pokedex",
-		callback:    commandExit,
-	}
-    cliCommands["help"] = cliCommand{ 
-		name:        "help",
-		description: "Displays a help message",
-		callback:    commandHelp,
-	}
+	cache := PokeCache.NewCache(10 * time.Second)
 
 	// Start REPL (Read-Eval-Print Loop)
 	scanner := bufio.NewScanner(os.Stdin)
@@ -69,9 +46,13 @@ func main() {
 		
 		cleanedWords := cleanInput(line)
 		commandFound := false
-		for _, command := range cliCommands {
+		for _, command := range getCommands() {
 			if cleanedWords[0] == command.name {
-				if err := command.callback(); err != nil {
+				if len(cleanedWords) < 2 {
+					cleanedWords = append(cleanedWords, "")
+				}
+
+				if err := command.callback(cfg, cache, cleanedWords[1]); err != nil {
 					fmt.Printf("Error executing command '%s': %v\n", command.name, err)
 				}
 				commandFound = true
